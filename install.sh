@@ -1,46 +1,46 @@
-#!/bin/bash
-# cmux installer — installs cmux + cmux-team to ~/.cmux/
+#!/bin/sh
+# cmux installer — run via: curl -fsSL <url> | sh
 set -e
 
+RELEASE_URL="https://github.com/smaiau/cmux/releases/latest/download"
+
 INSTALL_DIR="$HOME/.cmux"
-REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+INSTALL_PATH="$INSTALL_DIR/cmux.sh"
+INSTALL_PATH_TEAM="$INSTALL_DIR/cmux-team.sh"
 
-echo "Installing cmux to $INSTALL_DIR..."
-
+# Download
 mkdir -p "$INSTALL_DIR"
+echo "Downloading cmux..."
+curl -fsSL "$RELEASE_URL/cmux.sh" -o "$INSTALL_PATH"
+curl -fsSL "$RELEASE_URL/cmux-team.sh" -o "$INSTALL_PATH_TEAM"
+curl -fsSL "$RELEASE_URL/VERSION" | tr -d '[:space:]' > "$INSTALL_DIR/VERSION"
 
-# Copy scripts
-cp "$REPO_DIR/cmux.sh" "$INSTALL_DIR/cmux.sh"
-cp "$REPO_DIR/cmux-team.sh" "$INSTALL_DIR/cmux-team.sh"
-cp "$REPO_DIR/VERSION" "$INSTALL_DIR/VERSION"
+# Clear stale update-check cache from any previous install
+rm -f "$INSTALL_DIR/.latest_version" "$INSTALL_DIR/.last_check"
 
-# Detect shell config
-if [[ -n "$ZSH_VERSION" ]] || [[ "$SHELL" == */zsh ]]; then
-  RC_FILE="$HOME/.zshrc"
-else
-  RC_FILE="$HOME/.bashrc"
-fi
+# Detect shell rc file
+case "$SHELL" in
+  */zsh)  RC_FILE="$HOME/.zshrc" ;;
+  *)      RC_FILE="$HOME/.bashrc" ;;
+esac
 
-# Check if already sourced
 SOURCE_LINE_CMUX='source "$HOME/.cmux/cmux.sh"'
 SOURCE_LINE_TEAM='source "$HOME/.cmux/cmux-team.sh"'
 
-if ! grep -qF 'cmux/cmux.sh' "$RC_FILE" 2>/dev/null; then
-  echo "" >> "$RC_FILE"
-  echo "# cmux" >> "$RC_FILE"
-  echo "$SOURCE_LINE_CMUX" >> "$RC_FILE"
-  echo "$SOURCE_LINE_TEAM" >> "$RC_FILE"
+# Idempotently add source lines
+if ! grep -qF '.cmux/cmux.sh' "$RC_FILE" 2>/dev/null; then
+  printf '\n# cmux\n%s\n%s\n' "$SOURCE_LINE_CMUX" "$SOURCE_LINE_TEAM" >> "$RC_FILE"
   echo "Added source lines to $RC_FILE"
 else
-  echo "Already sourced in $RC_FILE"
-fi
-
-# Add cmux-team if only cmux is sourced
-if ! grep -qF 'cmux-team.sh' "$RC_FILE" 2>/dev/null; then
-  echo "$SOURCE_LINE_TEAM" >> "$RC_FILE"
-  echo "Added cmux-team source to $RC_FILE"
+  # Add cmux-team if only cmux is sourced
+  if ! grep -qF 'cmux-team.sh' "$RC_FILE" 2>/dev/null; then
+    printf '%s\n' "$SOURCE_LINE_TEAM" >> "$RC_FILE"
+    echo "Added cmux-team source to $RC_FILE"
+  else
+    echo "Source lines already in $RC_FILE"
+  fi
 fi
 
 echo ""
-echo "Installed! Restart your shell or run:"
+echo "cmux installed! To start using it:"
 echo "  source $RC_FILE"
